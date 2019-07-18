@@ -1,0 +1,232 @@
+include	rectan.inc
+include	Picture.inc
+;include string.inc
+
+.model small
+.stack 100h
+.data
+
+MsgUpExit   db	10,13,10,'Press any key to exit...',13,10,'$'
+err_msg	    db	'Input error',13,10,'$'
+alpha	dd	0.0
+delta	dd	0.001
+delta2	dd	0.01
+xdiv2	 dw	 0
+ydiv2	 dw	 0
+tmp	dd	0.0
+tmp2	dd	0.0
+divK	dw	0
+x3	dd	3.0
+x10	dd	10.0
+xr	dw	0
+yr	dw	0
+rx	dw	0
+ry	dw	0
+x1	dw	0
+x2	dw	0
+y1	dw	0
+y2	dw	0
+AboutMe	db	176,177,178,177,176,176,177,178,178,177,176,176,177,178,178,177,176,176,177,178,177,'[ Courswork - Aline Tkachenko -  2019]',178,177,176,176,177,178,178,177,176,176,177,178,178,177,176,177,178,178,177,176,'$'
+
+nextLine db	13,10,'$'
+buffer	label	byte
+max	db	6
+act	db	?
+field	db	6 dup(?)
+L	dw	6
+
+count	dw	?
+x0	dw	?
+y0	dw	?
+x_1	dw	?
+y_1	dw	?
+xint	dw	?
+yint	dw	?
+outCol	db	6
+inCol	db	11
+EntX0	db	'Enter x0: $'
+EntX1	db	'Enter x1: $'
+EntY0	db	'Enter y0: $'
+EntY1	DB	'Enter y1: $'
+EntInCol db	'Enter fill colour: $'
+EntOutCol db	'Enter circuit colour: $'
+EntCount db	'Enter count of rictangle (max 100): $'
+EntMode	db	'Show a picture:0, lets draw:1 $'
+EntXint	db	'Enter interval to X: $'
+EntYint	db	'Enter interval to Y: $'
+Mode	dw	?
+mass	byte	256 dup(?)
+.code
+.486
+EnterValue macro value,	msg
+	pusha
+	mov	dx, offset msg
+	call	writeString
+	call	readString
+	call	AsciiToBin
+	mov	value,ax
+	mov	dx,offset nextLine
+	call	writeString
+	popa
+endm
+main:
+	mov	ax,@data
+	mov	ds,ax
+
+	EnterValue Mode,EntMode
+	cmp	Mode,0
+	je	pic
+
+	EnterValue x0,EntX0
+	EnterValue y0,EntY0
+	EnterValue x1,EntX1
+	EnterValue y1,EntY1
+	;EnterValue inCol,EntInCol
+	;EnterValue outCol,EntOutCol
+	EnterValue count,EntCount
+	EnterValue xint,EntXint
+	EnterValue yint,EntYint
+	cmp	x0,640
+	ja	end1
+	cmp	x1,640
+	ja	end1
+	cmp	y0,480
+	ja	end1
+	cmp	y1,480
+	ja	end1
+	mov	ax,x_1
+	cmp	x0,ax
+	je	end1
+	mov	ax,y_1
+	cmp	y0,ax
+	je	end1
+
+	mov	ax,xint
+	mov	bx,yint
+	StartDraw
+
+	mov	cx,count
+	cmp	count,100
+	ja	end1
+lp:
+
+	Rectangle x0,y0,x1,y1,outCol,inCol	;outCol,inCol
+	add	x0,ax
+	add	y0,bx
+	add	x1,ax
+	add	y1,bx
+	add	outCol,1
+	add	inCol,1
+	cmp	inCol,15		;max 15
+	ja	inz
+	cmp	outCol,15
+	ja	outz
+	dec	cx
+	jnz	lp
+	jz	end1			;exit
+	cmp	x1,640			;max screen 640x480 VGA
+	ja	end1
+	cmp	y1,480		       ;max
+	ja	end1
+inz:
+	mov	inCol,0
+	jmp	lp
+outz:
+	mov	outCol,0
+	jmp	lp
+
+pic:
+	StartDraw
+	Picture
+end1:
+	mov	ax,4c00h
+	int 21h
+
+
+AsciiToBin	PROC
+	xor	di,di
+	xor	ax,ax
+	mov	cl,act
+	xor	ch,ch
+	xor	bx,bx
+	mov	si,cx
+	mov	cl,10
+asc2hex:
+	mov	bl,byte	ptr field[di]
+	sub	bl,'0'
+	jb	asc_err
+	cmp	bl,'9'
+	ja	asc_err
+	mul	cx
+	add	ax,bx
+	inc	di
+	cmp	di,si
+	jb	asc2hex
+	ret
+asc_err:
+	mov	dx,offset err_msg
+	call	writeString
+	mov	dx,offset MsgUpExit
+	call	writeString
+	call	waitPressing
+	call	ExitProgram
+AsciiToBin	ENDP
+;_______________________________________________________________________
+BinToAscii	PROC
+	mov	cx,L			; output line size
+Fill_Buff:
+	mov	byte ptr[bx],' '
+	inc	bx
+	loop	Fill_Buff
+	mov	si,10
+Cld_Dvd:
+	xor	dx,dx
+	div	si
+	add	dx,'0'
+	dec	bx
+	mov	byte ptr[bx],dl		;char to buf
+	inc	cx
+	or	ax,ax
+	jnz	Cld_Dvd
+	ret
+BinToAscii	ENDP
+;________________________________________________________________________
+readString	PROC
+	push	ax
+	mov	dx,offset buffer
+	mov	ah,0ch
+	mov	al,0ah
+	int	21h
+	xor	ch,ch
+	mov	cl,act
+	add	dx,2
+	pop	ax
+	ret
+readString	ENDP
+;___________________________________________________________________________
+writeString	PROC
+	push	ax
+	mov	ah,09h
+	int	21h
+	pop	ax
+	ret
+writeString	ENDP
+;__________________________________________________________________________
+waitPressing	PROC
+	push	ax
+	mov	ah,8
+	int	21h
+	pop	ax
+	ret
+waitPressing	ENDP
+;___________________________________________________________________________
+ExitProgram	PROC
+	mov	ax,4c00h
+	int	21h
+	ret
+ExitProgram	ENDP
+
+
+
+
+end	main
